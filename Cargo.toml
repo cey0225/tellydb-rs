@@ -1,0 +1,21 @@
+[workspace]
+members = [
+    "crates/telly-proto",
+    "crates/telly-core",
+    "crates/telly-common",
+    "bins/telly-server",
+    "bins/telly-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Ceyhun <cey0225@proton.me>"]
+license = "BSD-3-Clause"
+
+[workspace.dependencies]
+mio = { version = "1.2.0", features = ["net", "os-poll"] }
+log = "0.4.29"
+env_logger = "0.11.10"
+rustls = "0.23.37"
