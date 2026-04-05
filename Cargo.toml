@@ -2,7 +2,6 @@
 members = [
     "crates/telly-proto",
     "crates/telly-core",
-    "crates/telly-common",
     "bins/telly-server",
     "bins/telly-cli",
 ]

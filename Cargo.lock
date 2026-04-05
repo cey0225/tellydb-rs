@@ -7,10 +7,6 @@ name = "telly-cli"
 version = "0.1.0"
 
 [[package]]
-name = "telly-common"
-version = "0.1.0"
-
-[[package]]
 name = "telly-core"
 version = "0.1.0"
 
