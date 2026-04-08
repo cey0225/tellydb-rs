@@ -73,6 +73,8 @@ pub enum ParseError {
     InvalidProtocol,
 }
 
+type ParseResult<'a> = Result<(usize, RespData<'a>), ParseError>;
+
 /// Finds the position of the first `\r\n` sequence in the buffer.
 fn find_crlf(buffer: &[u8]) -> Option<usize> {
     buffer.windows(2).position(|w| w == b"\r\n")
@@ -81,7 +83,7 @@ fn find_crlf(buffer: &[u8]) -> Option<usize> {
 /// Parses a single RESP value from the buffer.
 ///
 /// Returns the number of bytes consumed and the parsed value.
-pub fn parse(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
+pub fn parse(buffer: &[u8]) -> ParseResult<'_> {
     if buffer.is_empty() {
         return Err(ParseError::Incomplete);
     }
@@ -97,7 +99,7 @@ pub fn parse(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
 }
 
 /// Parses a simple string: `+OK\r\n`
-fn parse_simple_string(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
+fn parse_simple_string(buffer: &[u8]) -> ParseResult<'_> {
     if let Some(pos) = find_crlf(buffer) {
         let data = &buffer[1..pos];
         let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
@@ -108,7 +110,7 @@ fn parse_simple_string(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseErro
 }
 
 /// Parses an error: `-ERR message\r\n`
-fn parse_error(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
+fn parse_error(buffer: &[u8]) -> ParseResult<'_> {
     if let Some(pos) = find_crlf(buffer) {
         let data = &buffer[1..pos];
         let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
@@ -119,7 +121,7 @@ fn parse_error(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
 }
 
 /// Parses an integer: `:1000\r\n`
-fn parse_integer(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
+fn parse_integer(buffer: &[u8]) -> ParseResult<'_> {
     if let Some(pos) = find_crlf(buffer) {
         let data = &buffer[1..pos];
         let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
@@ -131,7 +133,7 @@ fn parse_integer(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
 }
 
 /// Parses a bulk string: `$5\r\nhello\r\n`, or null: `$-1\r\n`
-fn parse_bulk_string(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
+fn parse_bulk_string(buffer: &[u8]) -> ParseResult<'_> {
     let length_end = find_crlf(buffer).ok_or(ParseError::Incomplete)?;
     let length_str = std::str::from_utf8(&buffer[1..length_end])
         .map_err(|_| ParseError::InvalidProtocol)?;
@@ -159,7 +161,7 @@ fn parse_bulk_string(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError>
 }
 
 /// Parses an array: `*2\r\n...`, or null: `*-1\r\n`
-fn parse_array(buffer: &[u8]) -> Result<(usize, RespData<'_>), ParseError> {
+fn parse_array(buffer: &[u8]) -> ParseResult<'_> {
     let length_end = find_crlf(buffer).ok_or(ParseError::Incomplete)?;
     let length_str = std::str::from_utf8(&buffer[1..length_end])
         .map_err(|_| ParseError::InvalidProtocol)?;
