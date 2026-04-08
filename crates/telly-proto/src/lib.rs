@@ -100,36 +100,27 @@ pub fn parse(buffer: &[u8]) -> ParseResult<'_> {
 
 /// Parses a simple string: `+OK\r\n`
 fn parse_simple_string(buffer: &[u8]) -> ParseResult<'_> {
-    if let Some(pos) = find_crlf(buffer) {
-        let data = &buffer[1..pos];
-        let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
-        Ok((pos + 2, RespData::SimpleString(s)))
-    } else {
-        Err(ParseError::Incomplete)
-    }
+    let pos = find_crlf(buffer).ok_or(ParseError::Incomplete)?;
+    let data = &buffer[1..pos];
+    let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
+    Ok((pos + 2, RespData::SimpleString(s)))
 }
 
 /// Parses an error: `-ERR message\r\n`
 fn parse_error(buffer: &[u8]) -> ParseResult<'_> {
-    if let Some(pos) = find_crlf(buffer) {
-        let data = &buffer[1..pos];
-        let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
-        Ok((pos + 2, RespData::Error(s)))
-    } else {
-        Err(ParseError::Incomplete)
-    }
+    let pos = find_crlf(buffer).ok_or(ParseError::Incomplete)?;
+    let data = &buffer[1..pos];
+    let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
+    Ok((pos + 2, RespData::Error(s)))
 }
 
 /// Parses an integer: `:1000\r\n`
 fn parse_integer(buffer: &[u8]) -> ParseResult<'_> {
-    if let Some(pos) = find_crlf(buffer) {
-        let data = &buffer[1..pos];
-        let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
-        let int = s.parse::<i64>().map_err(|_| ParseError::InvalidProtocol)?;
-        Ok((pos + 2, RespData::Integer(int)))
-    } else {
-        Err(ParseError::Incomplete)
-    }
+    let pos = find_crlf(buffer).ok_or(ParseError::Incomplete)?;
+    let data = &buffer[1..pos];
+    let s = std::str::from_utf8(data).map_err(|_| ParseError::InvalidProtocol)?;
+    let int = s.parse::<i64>().map_err(|_| ParseError::InvalidProtocol)?;
+    Ok((pos + 2, RespData::Integer(int)))
 }
 
 /// Parses a bulk string: `$5\r\nhello\r\n`, or null: `$-1\r\n`
