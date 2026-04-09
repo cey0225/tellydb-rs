@@ -35,7 +35,7 @@ pub enum RespData<'a> {
     BulkString(&'a [u8]),
     Array(Vec<RespData<'a>>),
     NullBulkString,
-    NullArray
+    NullArray,
 }
 
 impl RespData<'_> {
@@ -83,17 +83,17 @@ fn find_crlf(buffer: &[u8]) -> Option<usize> {
 /// Parses a single RESP value from the buffer.
 ///
 /// Returns the number of bytes consumed and the parsed value.
-pub fn parse(buffer: &[u8]) -> ParseResult<'_> {
-    if buffer.is_empty() {
+pub fn parse(buffer: &(impl AsRef<[u8]> + ?Sized)) -> ParseResult<'_> {
+    if buffer.as_ref().is_empty() {
         return Err(ParseError::Incomplete);
     }
 
-    match buffer[0] {
-        b'+' => parse_simple_string(buffer),
-        b'-' => parse_error(buffer),
-        b':' => parse_integer(buffer),
-        b'$' => parse_bulk_string(buffer),
-        b'*' => parse_array(buffer),
+    match buffer.as_ref()[0] {
+        b'+' => parse_simple_string(buffer.as_ref()),
+        b'-' => parse_error(buffer.as_ref()),
+        b':' => parse_integer(buffer.as_ref()),
+        b'$' => parse_bulk_string(buffer.as_ref()),
+        b'*' => parse_array(buffer.as_ref()),
         _ => Err(ParseError::InvalidProtocol),
     }
 }
@@ -126,9 +126,11 @@ fn parse_integer(buffer: &[u8]) -> ParseResult<'_> {
 /// Parses a bulk string: `$5\r\nhello\r\n`, or null: `$-1\r\n`
 fn parse_bulk_string(buffer: &[u8]) -> ParseResult<'_> {
     let length_end = find_crlf(buffer).ok_or(ParseError::Incomplete)?;
-    let length_str = std::str::from_utf8(&buffer[1..length_end])
+    let length_str =
+        std::str::from_utf8(&buffer[1..length_end]).map_err(|_| ParseError::InvalidProtocol)?;
+    let length: isize = length_str
+        .parse()
         .map_err(|_| ParseError::InvalidProtocol)?;
-    let length: isize = length_str.parse().map_err(|_| ParseError::InvalidProtocol)?;
 
     if length == -1 {
         return Ok((length_end + 2, RespData::NullBulkString));
@@ -154,9 +156,11 @@ fn parse_bulk_string(buffer: &[u8]) -> ParseResult<'_> {
 /// Parses an array: `*2\r\n...`, or null: `*-1\r\n`
 fn parse_array(buffer: &[u8]) -> ParseResult<'_> {
     let length_end = find_crlf(buffer).ok_or(ParseError::Incomplete)?;
-    let length_str = std::str::from_utf8(&buffer[1..length_end])
+    let length_str =
+        std::str::from_utf8(&buffer[1..length_end]).map_err(|_| ParseError::InvalidProtocol)?;
+    let length: isize = length_str
+        .parse()
         .map_err(|_| ParseError::InvalidProtocol)?;
-    let length: isize = length_str.parse().map_err(|_| ParseError::InvalidProtocol)?;
 
     if length == -1 {
         return Ok((length_end + 2, RespData::NullArray));
@@ -233,10 +237,13 @@ mod tests {
         let input = b"*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
         let (len, data) = parse(input).unwrap();
         assert_eq!(len, input.len());
-        assert_eq!(data, RespData::Array(vec![
-            RespData::BulkString(b"foo"),
-            RespData::BulkString(b"bar"),
-        ]));
+        assert_eq!(
+            data,
+            RespData::Array(vec![
+                RespData::BulkString(b"foo"),
+                RespData::BulkString(b"bar"),
+            ])
+        );
     }
 
     #[test]
@@ -257,11 +264,14 @@ mod tests {
     fn mixed_types_array() {
         let input = b"*3\r\n+OK\r\n:-1\r\n$4\r\ntest\r\n";
         let (_, data) = parse(input).unwrap();
-        assert_eq!(data, RespData::Array(vec![
-            RespData::SimpleString("OK"),
-            RespData::Integer(-1),
-            RespData::BulkString(b"test"),
-        ]));
+        assert_eq!(
+            data,
+            RespData::Array(vec![
+                RespData::SimpleString("OK"),
+                RespData::Integer(-1),
+                RespData::BulkString(b"test"),
+            ])
+        );
     }
 
     #[test]
